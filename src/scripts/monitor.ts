@@ -5,26 +5,25 @@ import * as ABI from "../artifacts/contracts/KeyperPayer.sol/KeyperPayer.json";
 
 dotEnvConfig({ override: true });
 
-const ContractAddress = process.env.CONTRACT_ADDRESS || "";
-const KeyperAddress = process.env.KEYPER_ADDRESS || "";
-const RpcURL = process.env.RPC_URL || "";
+const { CONTRACT_ADDRESS = "", KEYPER_ADDRESS = "", RPC_URL = "" } = process.env;
+
+function validate(name: string, value: string, validateValue: boolean = true) {
+  if (!value) {
+    throw `${name} env variable should be set`;
+  }
+  if (!ethers.isAddress(value) && validateValue) {
+    throw `${name} env variable is not an address`;
+  }
+}
 
 async function main() {
-  if (ContractAddress == "") {
-    throw "CONTRACT_ADDRESS env variable should be set";
-  }
-  if (!ethers.isAddress(ContractAddress)) {
-    throw "CONTRACT_ADDRESS env variable is not an address";
-  }
-  if (KeyperAddress == "") {
-    throw "KEYPER_ADDRESS env variable should be set";
-  }
-  if (!ethers.isAddress(KeyperAddress)) {
-    throw "KEYPER_ADDRESS env variable is not an address";
-  }
-  const provider = new ethers.JsonRpcProvider(RpcURL);
-  const contract = new ethers.Contract(ContractAddress, ABI.abi, provider);
-  const balance = await contract.BalanceOf(KeyperAddress);
+  validate("CONTRACT_ADDRESS", CONTRACT_ADDRESS);
+  validate("KEYPER_ADDRESS", KEYPER_ADDRESS);
+  validate("RPC_URL", RPC_URL, false);
+
+  const provider = new ethers.JsonRpcProvider(RPC_URL);
+  const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI.abi, provider);
+  const balance = await contract.balanceOf(KEYPER_ADDRESS);
   if (balance == BigInt(0)) {
     throw "There is no SPT token found";
   }

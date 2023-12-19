@@ -17,7 +17,7 @@ describe("test scripts", function () {
     const [owner] = await ethers.getSigners();
     const { token } = await loadFixture(deployMintableToken);
     const keyperPayer = await ethers.deployContract("KeyperPayer", [token.target]);
-    await keyperPayer.SetKeypers([owner]);
+    await keyperPayer.setKeypers([owner]);
     return { token, keyperPayer };
   }
 
@@ -141,9 +141,12 @@ describe("test scripts", function () {
     });
     it("should fail without any token", async () => {
       const [keyper] = await ethers.getSigners();
-      const { token, keyperPayer } = await loadFixture(deployKeyperPayer);
 
-      generateEnvFile(token.target.toString(), keyperPayer.target.toString(), keyper.address);
+      generateEnvFile(
+        testToken.target.toString(),
+        paymentContract.target.toString(),
+        keyper.address,
+      );
       const proc = child.spawnSync("yarn run monitor", [], {
         shell: true,
         cwd: process.cwd(),
@@ -156,7 +159,7 @@ describe("test scripts", function () {
       const amount = ethers.parseEther("1");
       await testToken.mint(payer, amount);
       await testToken.connect(payer).approve(paymentContract, amount);
-      await paymentContract.connect(payer).Pay(amount);
+      await paymentContract.connect(payer).pay(amount);
       generateEnvFile(
         testToken.target.toString(),
         paymentContract.target.toString(),

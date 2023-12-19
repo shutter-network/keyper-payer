@@ -5,16 +5,16 @@ function startTests() {
     cwd: process.cwd(),
     shell: true,
     env: process.env,
+    stdio: "inherit",
   });
-  console.log(unitTests.stdout.toString());
   const integrationTests = child.spawnSync("yarn run integration-tests", {
     cwd: process.cwd(),
     shell: true,
     env: process.env,
+    stdio: "inherit",
   });
-  console.log(integrationTests.stdout.toString());
-  const unitTestsCode = unitTests.stderr.toString() == "" ? 0 : 1;
-  const integrationTestsCode = integrationTests.stderr.toString() == "" ? 0 : 1;
+  const unitTestsCode = unitTests.status == null ? 1 : unitTests.status;
+  const integrationTestsCode = integrationTests.status == null ? 1 : integrationTests.status;
   return unitTestsCode | integrationTestsCode;
 }
 
