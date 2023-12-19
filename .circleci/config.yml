@@ -1,0 +1,45 @@
+version: 2.1
+
+setup: true
+
+orbs:
+  node: circleci/node@5.1.1
+
+jobs:
+  lint:
+    working_directory: ~/project/src
+    docker:
+      - image: cimg/node:20.10
+    steps:
+      - checkout:
+          path: ~/project
+      - node/install-packages:
+          pkg-manager: yarn
+      - node/install-packages:
+          cache-path: ~/project/src/node_modules
+          override-ci-command: yarn install
+      - run: |
+          yarn run compile-contracts
+          yarn run lint
+          yarn run check-contract
+  test:
+    working_directory: ~/project/src
+    docker:
+      - image: cimg/node:20.10
+    steps:
+      - checkout:
+          path: ~/project
+      - node/install-packages:
+          pkg-manager: yarn
+      - node/install-packages:
+          cache-path: ~/project/src/node_modules
+          override-ci-command: yarn install
+      - run: |
+          yarn run compile-contracts
+          yarn run tests
+
+workflows:
+  app:
+    jobs:
+      - lint
+      - test
