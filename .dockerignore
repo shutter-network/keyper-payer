@@ -1,0 +1,4 @@
+src/node_modules
+src/cache
+src/artifacts
+src/.env
