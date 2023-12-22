@@ -38,7 +38,7 @@ contract KeyperPayer is Ownable {
     }
   }
 
-  function withdraw() public {
+  function withdraw() external {
     uint amount = balances[msg.sender];
     require(amount > 0, "insufficient balance");
     balances[msg.sender] = 0;
