@@ -79,5 +79,24 @@ describe("KeyperPayer", function () {
       await keyperPayer.connect(keyper).withdraw();
       expect(await keyperPayer.balanceOf(keyper)).to.be.equal(0);
     });
+    it("pay multiple times", async function () {
+      const { token, keyperPayer } = await loadFixture(deployKeyperPayer);
+      const [, payer, keyper, keyper2] = await ethers.getSigners();
+      const amount1 = ethers.parseEther("1");
+      const amount2 = ethers.parseEther("2");
+      const totalAmount = amount1 + amount2;
+      await token.mint(payer, totalAmount);
+      expect(await token.balanceOf(payer)).to.be.equal(totalAmount);
+      await keyperPayer.setKeypers([keyper.address, keyper2.address]);
+      await token.connect(payer).approve(keyperPayer, totalAmount);
+      await keyperPayer.connect(payer).pay(amount1);
+      await keyperPayer.connect(payer).pay(amount2);
+      expect(await token.balanceOf(payer)).to.be.equal(0);
+      expect(await token.balanceOf(keyperPayer)).to.be.equal(totalAmount);
+      expect(await keyperPayer.balanceOf(keyper2)).to.be.equal(totalAmount / toBigInt(2));
+      expect(await keyperPayer.balanceOf(keyper)).to.be.equal(totalAmount / toBigInt(2));
+      await keyperPayer.connect(keyper).withdraw();
+      expect(await keyperPayer.balanceOf(keyper)).to.be.equal(0);
+    });
   });
 });

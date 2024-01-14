@@ -34,7 +34,7 @@ contract KeyperPayer is Ownable {
     uint share = amount / keypers.length;
 
     for (uint i = 0; i < keypers.length; i++) {
-      balances[keypers[i]] = share;
+      balances[keypers[i]] += share;
     }
   }
 
