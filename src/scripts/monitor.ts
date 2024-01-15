@@ -1,11 +1,15 @@
+import { exec } from "child_process";
 import { config as dotEnvConfig } from "dotenv";
 import { ethers } from "ethers";
+import { promisify } from "util";
 
 import * as ABI from "../artifacts/contracts/KeyperPayer.sol/KeyperPayer.json";
 
+const asyncExec = promisify(exec);
+
 dotEnvConfig({ override: true });
 
-const { CONTRACT_ADDRESS = "", RPC_URL = "" } = process.env;
+const { CONTRACT_ADDRESS = "", RPC_URL = "", UNPAID_COMMAND = "" } = process.env;
 
 function validate(name: string, value: string, validateValue: boolean = true) {
   if (!value) {
@@ -24,7 +28,21 @@ async function main() {
   const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI.abi, provider);
   const isPaid = await contract.isPaid();
   if (!isPaid) {
-    throw "Keypers are not paid sufficiently";
+    console.error("Keypers are not paid sufficiently.");
+    if (UNPAID_COMMAND == "") {
+      console.error("UNPAID_COMMAND not specified, exiting.");
+    } else {
+      try {
+        console.error(`Executing UNPAID_COMMAND: ${UNPAID_COMMAND}`);
+        const { stdout, stderr } = await asyncExec(UNPAID_COMMAND);
+        console.error(`UNPAID_COMMAND executed successfully.`);
+        console.error(`stdout: ${stdout}`);
+        console.error(`stderr: ${stderr}`);
+      } catch (error) {
+        console.error(`Failed to execute unpaid command: ${error}`);
+      }
+    }
+    throw "";
   }
 }
 

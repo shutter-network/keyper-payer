@@ -32,8 +32,9 @@ describe("test scripts", function () {
     tokenAddress: string,
     contractAddress: string,
     keyperAddresses: string[],
-    requestedRate: BigInt,
+    requestedRate: bigint,
     startTimestamp: number,
+    unpaidCommand: string = "",
   ) {
     const content =
       `TOKEN_ADDRESS=${tokenAddress}\n` +
@@ -41,7 +42,8 @@ describe("test scripts", function () {
       `KEYPER_ADDRESSES=${keyperAddresses.join(",")}\n` +
       `REQUESTED_RATE=${requestedRate}\n` +
       `START_TIMESTAMP=${startTimestamp}\n` +
-      `RPC_URL=http://127.0.0.1:8545\n`;
+      `RPC_URL=http://127.0.0.1:8545\n` +
+      `UNPAID_COMMAND=${unpaidCommand}\n`;
     fs.writeFileSync(".env", content);
   }
 
@@ -145,17 +147,30 @@ describe("test scripts", function () {
       ).to.be.equal(true);
     });
     it("should fail without payment", async () => {
-      const [keyper] = await ethers.getSigners();
-
       generateEnvFile("", paymentContract.target.toString(), [], 0n, 0);
       const proc = child.spawnSync("yarn run monitor", [], {
         shell: true,
         cwd: process.cwd(),
       });
       expect(proc.status).to.be.equal(1);
-      expect(proc.stderr.toString().includes("Keypers are not paid sufficiently\n")).to.be.equal(
+      expect(proc.stderr.toString().includes("Keypers are not paid sufficiently.")).to.be.equal(
         true,
       );
+      expect(
+        proc.stderr.toString().includes("UNPAID_COMMAND not specified, exiting."),
+      ).to.be.equal(true);
+    });
+    it("should execute command on failure", async () => {
+      generateEnvFile("", paymentContract.target.toString(), [], 0n, 0, "echo testmessage");
+      const proc = child.spawnSync("yarn run monitor", [], {
+        shell: true,
+        cwd: process.cwd(),
+      });
+      expect(proc.status).to.be.equal(1);
+      expect(proc.stderr.toString().includes("UNPAID_COMMAND executed successfully.")).to.be.equal(
+        true,
+      );
+      expect(proc.stderr.toString().includes("stdout: testmessage")).to.be.equal(true);
     });
     it("should success", async () => {
       const [, payer] = await ethers.getSigners();
