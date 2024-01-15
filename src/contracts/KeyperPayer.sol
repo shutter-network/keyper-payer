@@ -3,21 +3,23 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract KeyperPayer is Ownable {
+contract KeyperPayer {
   using SafeERC20 for IERC20;
 
   mapping(address => uint) private balances;
+  uint256 public totalPaid;
+  uint256 public startTimestamp;
   address[] private keypers;
   address public sptTokenAddress;
+  uint256 public requestedRate; // tokens per second
 
-  constructor(address tokenAddress) Ownable(msg.sender) {
-    sptTokenAddress = tokenAddress;
-  }
-
-  function setKeypers(address[] calldata addresses) public onlyOwner {
-    keypers = addresses;
+  constructor(address _sptTokenAddress, address[] memory _keypers, uint256 _requestedRate, uint256 _startTimestamp) {
+    require(_keypers.length > 0);
+    sptTokenAddress = _sptTokenAddress;
+    requestedRate = _requestedRate;
+    keypers = _keypers;
+    startTimestamp = _startTimestamp;
   }
 
   function getKeypers() public view returns (address[] memory) {
@@ -26,8 +28,7 @@ contract KeyperPayer is Ownable {
 
   function pay(uint amount) external {
     require(amount > 0, "amount should be bigger than zero");
-    require(keypers.length > 0, "keypers should be set");
-    require(amount % keypers.length == 0, "amount can not be shared with keypers");
+    require(amount % keypers.length == 0, "amount needs to be divisible by number of keypers");
     uint allowance = IERC20(sptTokenAddress).allowance(msg.sender, address(this));
     require(allowance >= amount, "insufficient allowance");
     IERC20(sptTokenAddress).safeTransferFrom(msg.sender, address(this), amount);
@@ -36,6 +37,7 @@ contract KeyperPayer is Ownable {
     for (uint i = 0; i < keypers.length; i++) {
       balances[keypers[i]] += share;
     }
+    totalPaid += amount;
   }
 
   function withdraw() external {
@@ -47,5 +49,14 @@ contract KeyperPayer is Ownable {
 
   function balanceOf(address keyperAddress) public view returns (uint) {
     return balances[keyperAddress];
+  }
+
+  function isPaid() public view returns (bool) {
+      if (block.timestamp < startTimestamp) {
+          return true;
+      }
+      uint256 dt = block.timestamp - startTimestamp;
+      uint256 minPaid = requestedRate * dt;
+      return totalPaid >= minPaid;
   }
 }

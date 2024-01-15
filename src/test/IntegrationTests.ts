@@ -22,7 +22,7 @@ describe("test scripts", function () {
   }
 
   function generateEnvFile(tokenAddress: string, contractAddress: string, keyperAddress: string) {
-    const content = `TOKEN_ADDRESS=${tokenAddress}\nCONTRACT_ADDRESS=${contractAddress}\nKEYPER_ADDRESS=${keyperAddress}\nRPC_URL=http://localhost:8545`;
+    const content = `TOKEN_ADDRESS=${tokenAddress}\nCONTRACT_ADDRESS=${contractAddress}\nKEYPER_ADDRESS=${keyperAddress}\nRPC_URL=http://127.0.0.1:8545`;
     fs.writeFileSync(".env", content);
   }
 
