@@ -14,21 +14,46 @@ describe("test scripts", function () {
   }
 
   async function deployKeyperPayer() {
-    const [owner] = await ethers.getSigners();
+    const [, keyper1, keyper2] = await ethers.getSigners();
+    const keypers = [keyper1, keyper2];
     const { token } = await loadFixture(deployMintableToken);
-    const keyperPayer = await ethers.deployContract("KeyperPayer", [token.target]);
-    await keyperPayer.setKeypers([owner]);
-    return { token, keyperPayer };
+    const requestedRate = ethers.toBigInt(2); // 2e-18 tokens per second
+    const startTimestamp = 1704067200;
+    const keyperPayer = await ethers.deployContract("KeyperPayer", [
+      token.target,
+      [keyper1.address, keyper2.address],
+      requestedRate,
+      startTimestamp,
+    ]);
+    return { token, keyperPayer, keypers, requestedRate, startTimestamp };
   }
 
-  function generateEnvFile(tokenAddress: string, contractAddress: string, keyperAddress: string) {
-    const content = `TOKEN_ADDRESS=${tokenAddress}\nCONTRACT_ADDRESS=${contractAddress}\nKEYPER_ADDRESS=${keyperAddress}\nRPC_URL=http://127.0.0.1:8545`;
+  function generateEnvFile(
+    tokenAddress: string,
+    contractAddress: string,
+    keyperAddresses: string[],
+    requestedRate: BigInt,
+    startTimestamp: number,
+  ) {
+    const content =
+      `TOKEN_ADDRESS=${tokenAddress}\n` +
+      `CONTRACT_ADDRESS=${contractAddress}\n` +
+      `KEYPER_ADDRESSES=${keyperAddresses.join(",")}\n` +
+      `REQUESTED_RATE=${requestedRate}\n` +
+      `START_TIMESTAMP=${startTimestamp}\n` +
+      `RPC_URL=http://127.0.0.1:8545\n`;
     fs.writeFileSync(".env", content);
   }
 
   describe("deploy", () => {
     let tokenAddress: string;
     let oldEnv: Buffer;
+    const keyperAddresses = [
+      "0x9A2B8C7D5E6F4a309B1C3d2E5F6a7b809c1D2E3A",
+      "0x4F7A2d8b1c5e6F3a9B1c2D3E5F6a2b8c9A2B8C7D",
+    ];
+    const requestedRate = 100n;
+    const startTimestamp = 1704067200;
     before(async () => {
       try {
         oldEnv = fs.readFileSync(".env");
@@ -42,7 +67,7 @@ describe("test scripts", function () {
       fs.writeFileSync(".env", oldEnv);
     });
     it("should fail without token Address", () => {
-      generateEnvFile("", "", "");
+      generateEnvFile("", "", keyperAddresses, requestedRate, startTimestamp);
       process.env.HARDHAT_NETWORK = "localhost";
       const proc = child.spawnSync("yarn run deploy", [], {
         shell: true,
@@ -55,7 +80,7 @@ describe("test scripts", function () {
       ).to.be.equal(true);
     });
     it("should fail if address is not an address", () => {
-      generateEnvFile("0x", "", "");
+      generateEnvFile("0x", "", keyperAddresses, requestedRate, startTimestamp);
       process.env.HARDHAT_NETWORK = "localhost";
       const proc = child.spawnSync("yarn run deploy", [], {
         shell: true,
@@ -68,9 +93,9 @@ describe("test scripts", function () {
       );
     });
     it("should be successful", () => {
-      generateEnvFile(tokenAddress, "", "");
+      generateEnvFile(tokenAddress, "", keyperAddresses, requestedRate, startTimestamp);
       process.env.HARDHAT_NETWORK = "localhost";
-      const msg = `KeyperPayer with token ${tokenAddress} deployed to`;
+      const msg = `KeyperPayer deployed to`;
       const proc = child.spawnSync("yarn run deploy", [], {
         shell: true,
         cwd: process.cwd(),
@@ -85,10 +110,12 @@ describe("test scripts", function () {
     let testToken: MintableToken;
     let paymentContract: KeyperPayer;
     let oldEnv: Buffer;
+    let rate: bigint;
     before(async () => {
-      const { token, keyperPayer } = await loadFixture(deployKeyperPayer);
+      const { token, keyperPayer, requestedRate } = await loadFixture(deployKeyperPayer);
       testToken = token;
       paymentContract = keyperPayer;
+      rate = requestedRate;
       const envContent = fs.readFileSync(".env");
       oldEnv = envContent;
     });
@@ -96,7 +123,7 @@ describe("test scripts", function () {
       fs.writeFileSync(".env", oldEnv);
     });
     it("should fail without contract address", async () => {
-      generateEnvFile(testToken.target.toString(), "", "");
+      generateEnvFile("", "", [], 0n, 0);
       const proc = child.spawnSync("yarn run monitor", [], {
         shell: true,
         cwd: process.cwd(),
@@ -107,7 +134,7 @@ describe("test scripts", function () {
       ).to.be.equal(true);
     });
     it("should fail without correct contract address", async () => {
-      generateEnvFile(testToken.target.toString(), "0x", "");
+      generateEnvFile("", "0x", [], 0n, 0);
       const proc = child.spawnSync("yarn run monitor", [], {
         shell: true,
         cwd: process.cwd(),
@@ -117,54 +144,26 @@ describe("test scripts", function () {
         proc.stderr.toString().includes("CONTRACT_ADDRESS env variable is not an address\n"),
       ).to.be.equal(true);
     });
-    it("should fail without keyper address", async () => {
-      generateEnvFile(testToken.target.toString(), paymentContract.target.toString(), "");
-      const proc = child.spawnSync("yarn run monitor", [], {
-        shell: true,
-        cwd: process.cwd(),
-      });
-      expect(proc.status).to.be.equal(1);
-      expect(
-        proc.stderr.toString().includes("KEYPER_ADDRESS env variable should be set\n"),
-      ).to.be.equal(true);
-    });
-    it("should fail without correct keyper address", async () => {
-      generateEnvFile(testToken.target.toString(), paymentContract.target.toString(), "0x");
-      const proc = child.spawnSync("yarn run monitor", [], {
-        shell: true,
-        cwd: process.cwd(),
-      });
-      expect(proc.status).to.be.equal(1);
-      expect(
-        proc.stderr.toString().includes("KEYPER_ADDRESS env variable is not an address\n"),
-      ).to.be.equal(true);
-    });
-    it("should fail without any token", async () => {
+    it("should fail without payment", async () => {
       const [keyper] = await ethers.getSigners();
 
-      generateEnvFile(
-        testToken.target.toString(),
-        paymentContract.target.toString(),
-        keyper.address,
-      );
+      generateEnvFile("", paymentContract.target.toString(), [], 0n, 0);
       const proc = child.spawnSync("yarn run monitor", [], {
         shell: true,
         cwd: process.cwd(),
       });
       expect(proc.status).to.be.equal(1);
-      expect(proc.stderr.toString().includes("There is no SPT token found\n")).to.be.equal(true);
+      expect(proc.stderr.toString().includes("Keypers are not paid sufficiently\n")).to.be.equal(
+        true,
+      );
     });
     it("should success", async () => {
-      const [keyper, payer] = await ethers.getSigners();
-      const amount = ethers.parseEther("1");
+      const [, payer] = await ethers.getSigners();
+      const amount = rate * ethers.toBigInt(100 * 365 * 24 * 60 * 60);
       await testToken.mint(payer, amount);
       await testToken.connect(payer).approve(paymentContract, amount);
       await paymentContract.connect(payer).pay(amount);
-      generateEnvFile(
-        testToken.target.toString(),
-        paymentContract.target.toString(),
-        keyper.address,
-      );
+      generateEnvFile("", paymentContract.target.toString(), [], 0n, 0);
       const proc = child.spawnSync("yarn run monitor", [], {
         shell: true,
         cwd: process.cwd(),
