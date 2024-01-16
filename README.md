@@ -1,6 +1,6 @@
 # Keyper Payer
 
-This project enables keypers to accept payment for their service. It consists of a smart contract and a corresponding monitoring script. By deploying and configuring the contract, the keypers communicate the price they want to be paid. The keypers run the monitoring script on their machines. If it detects that the keyeprs have been insufficiently paid, it shuts down the node.
+This project enables keypers to accept payment for their service in SPT. It consists of a smart contract and a corresponding monitoring script. By deploying and configuring the contract, the keypers communicate the price in SPT per second they want to be paid. The keypers run the monitoring script on their machines. If it detects that the keyeprs have been insufficiently paid, it shuts down the node.
 
 ## Requirements
 
@@ -73,3 +73,10 @@ This prevents the keyper from restarting when it is shutdown by the monitor as t
 ## Run the Tests
 
 To run unit and integration tests, run `yarn run tests` in `/src/`.
+
+## Pay and Withdraw
+
+1. Make an allowance to the keyper payer contract at `address` by calling `approve(address, amount)` on the SPT token contract, where `amount` is the amount to pay.
+2. Call `pay(amount)` on the keyper payer contract.
+
+Validators can check their balance with `balanceOf` and withdraw their share by calling `withdraw()`.
